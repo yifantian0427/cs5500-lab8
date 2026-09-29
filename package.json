@@ -9,7 +9,8 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "npm run build && node --test dist/tests/*.test.js"
   },
   "dependencies": {
     "express": "^5.1.0",
