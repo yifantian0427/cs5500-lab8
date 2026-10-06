@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
-import { ApiError } from '../services/reservation.service.js';
+import { ApiError } from '../services/errors.js';
 import type { ErrorResponse } from '../types/reservation.js';
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,

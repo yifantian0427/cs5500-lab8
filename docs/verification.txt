@@ -1,21 +1,23 @@
-Lab 2 verification — completed September 28, 2026
+Lab 3 verification - October 5, 2026 (America/Los_Angeles)
+
+Environment: Node v25.6.1, TypeScript 5.9, Express 5, Mongoose 8.
+Real MongoDB 8.0.15, temporary single-node replica set lab3 on localhost:27019.
+Dedicated test database: campushub_lab3_test. No production database used.
 
 PASS npm run typecheck
+PASS npm run build
 PASS npm run lint
 PASS npm run format:check
-PASS npm run build
-PASS npm test — 4 tests, 4 passed, 0 failed
+PASS npm test - 6 test groups, 0 failed, 0 skipped:
   HTTP contract: resources, creation, conflicts, active lookup and validation
-  Pending blocks bookings; cancelled is excluded and does not block
-  500 response hides internal exception details
-  Mongoose models validate without a database
-PASS OpenAPI 3.0 document validation against official JSON Schema:
-  https://spec.openapis.org/oas/3.0/schema/2024-10-18
-PASS All local OpenAPI $ref targets resolve
-PASS Five standalone Draft 7 JSON Schemas validate and compile
+  Pending blocks bookings; cancelled excluded and does not block
+  Persistence after reconnect; original timezone representation retained
+  HTTP 500 hides internal exceptions
+  Strict Mongoose schema validation
+  Concurrent booking across distinct service instances (1 success, 11 conflicts)
 
-Validation used the existing Lab 1 dependencies. No live database was used.
-The initial sandbox prevented local server binding; the HTTP tests were rerun
-successfully after network permission was granted.
+Lab 2 HTTP assertions retained; test setup changed from arrays to database fixtures.
+Database reference assertions and reconnect/concurrency checks added.
 
-No repository push or Canvas submission was performed.
+NOT PERFORMED: student's non-AI manual audit; GitHub push; Canvas submission.
+Docker Compose setup included but not executed here.

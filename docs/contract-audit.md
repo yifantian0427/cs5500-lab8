@@ -1,6 +1,6 @@
-# Contract verification and design decisions
+# Lab 2 contract decisions, with Lab 3 update
 
-## AI generation record
+## Historical Lab 2 AI generation record
 
 This solution was created with Codex using the lab's AI-assisted option. The contract was written first, then used to define the interfaces, router and implementation. Equivalent generation instruction:
 
@@ -28,7 +28,7 @@ This solution was created with Codex using the lab's AI-assisted option. The con
 5. Date strings use a documented ISO 8601 subset with timezone, seconds and optional 1–3 fractional digits. Calendar validity is checked in code; format/pattern alone does not check date order or overlap. Leap seconds and lowercase t/z are excluded.
 6. Unknown or unavailable resources return 400 with a specific code. Unknown users return an empty list. User name is an assumed minimal field because the handout does not specify a User shape.
 7. IDs are nonempty strings of up to 100 letters, digits, underscores or hyphens. This supports the handout's res-101 and user-456 values rather than requiring MongoDB ObjectIds.
-8. Mongoose stores Date values and an internal _id; the API exposes string dates and a separate public id. The draft models are not wired into the in-memory API. Cross-field validation and booking orchestration belong in the service layer; MongoDB references and concurrency control would need implementation before persistent use.
+8. Mongoose stores Date values and an internal _id; the API exposes string dates and a separate public id. Lab 3 wires the models into the API: resourceId is an internal ObjectId reference translated to the public resource ID by services. Transactions serialize bookings per resource. Date text is also retained for exact API round trips.
 9. The application exposes the three lab routes. The unused health scaffold files from Lab 1 remain available but are not mounted in this lab app.
 
 ## Architecture and reference
@@ -36,3 +36,7 @@ This solution was created with Codex using the lab's AI-assisted option. The con
 The inherited AGENTS.md shaped the implementation: thin routes, controllers for request/response handling, services for booking logic, models for schemas, no extra runtime dependencies, strict TypeScript and centralized errors. No new API endpoints were invented.
 
 OpenAPI structure follows the [official OpenAPI 3.0.3 specification](https://spec.openapis.org/oas/v3.0.3.html). Standalone JSON Schemas use Draft 7. See verification.txt for actual check results.
+
+## Lab 3 update
+
+Persistence now uses MongoDB. Resource listing is isolated in resource.service.ts and resource.controller.ts. Booking logic remains in reservation.service.ts; services have no Express dependencies, and controllers do not query models. Configuration is centralized in src/config. The API contract is unchanged except for its environment description. See manual-audit.md for the required personal review and verification.txt for executed checks.

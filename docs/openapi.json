@@ -3,7 +3,7 @@
   "info": {
     "title": "CampusHub Reservation API",
     "version": "1.0.0",
-    "description": "Lab 2 contract. Local in-memory demo; no authentication or database required."
+    "description": "Lab 2 API contract preserved by Lab 3 MongoDB implementation. Replica-set database required; no authentication."
   },
   "servers": [
     {

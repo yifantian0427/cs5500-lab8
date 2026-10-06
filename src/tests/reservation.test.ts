@@ -1,4 +1,7 @@
-import { test } from 'node:test';
+import { test, before, beforeEach, after } from 'node:test';
+import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../config/database.js';
+import { seedResources } from '../services/seed.service.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -13,6 +16,31 @@ import {
   ResourceModel,
   ReservationModel,
 } from '../models/domain.models.js';
+
+before(async (): Promise<void> => {
+  const uri = process.env.TEST_MONGODB_URI;
+  if (!uri)
+    throw new Error(
+      'Set TEST_MONGODB_URI to a dedicated replica-set test database.',
+    );
+  const databaseName = new URL(uri).pathname.slice(1);
+  if (!/test/i.test(databaseName))
+    throw new Error('Test database name must include test.');
+  await connectDatabase(uri);
+  await Promise.all([
+    ResourceModel.init(),
+    ReservationModel.init(),
+    UserModel.init(),
+  ]);
+});
+beforeEach(async (): Promise<void> => {
+  await ReservationModel.deleteMany({});
+  await ResourceModel.deleteMany({});
+  await seedResources();
+});
+after(async (): Promise<void> => {
+  await disconnectDatabase();
+});
 
 const payload: CreateReservationRequest = {
   resourceId: 'res-101',
@@ -148,26 +176,56 @@ test('HTTP contract: resources, creation, conflicts, active lookup and validatio
     });
   }
 });
-test('pending blocks bookings; cancelled is excluded and does not block', (): void => {
-  const pending: Reservation = { ...payload, id: 'pending', status: 'PENDING' };
-  const cancelled: Reservation = {
+test('pending blocks bookings; cancelled is excluded and does not block', async (): Promise<void> => {
+  const resource = await ResourceModel.findOne({
+    id: payload.resourceId,
+  }).orFail();
+  const stored = {
     ...payload,
-    id: 'cancelled',
-    status: 'CANCELLED',
+    resourceId: resource._id,
+    startTime: new Date(payload.startTime),
+    endTime: new Date(payload.endTime),
+    startTimeText: payload.startTime,
+    endTimeText: payload.endTime,
   };
-  const service = new ReservationService(undefined, [pending, cancelled]);
-  assert.deepEqual(service.listUserReservations(payload.userId), [pending]);
-  assert.throws((): Reservation => service.create(payload), {
-    code: 'DOUBLE_BOOKING',
-  });
-  assert.equal(
-    new ReservationService(undefined, [cancelled]).create(payload).status,
-    'CONFIRMED',
+  await ReservationModel.create([
+    { ...stored, id: 'pending', status: 'PENDING' },
+    { ...stored, id: 'cancelled', status: 'CANCELLED' },
+  ]);
+  const service = new ReservationService();
+  assert.deepEqual(await service.listUserReservations(payload.userId), [
+    { ...payload, id: 'pending', status: 'PENDING' },
+  ]);
+  await assert.rejects(service.create(payload), { code: 'DOUBLE_BOOKING' });
+  await ReservationModel.updateOne(
+    { id: 'pending' },
+    { $set: { status: 'CANCELLED' } },
   );
+  assert.equal((await service.create(payload)).status, 'CONFIRMED');
+});
+test('data survives disconnect and reconnect; API timestamps retain original timezone', async (): Promise<void> => {
+  const input = {
+    ...payload,
+    startTime: '2026-10-01T12:00:00+02:00',
+    endTime: '2026-10-01T13:00:00+02:00',
+  };
+  const created = await new ReservationService().create(input);
+  await disconnectDatabase();
+  const uri = process.env.TEST_MONGODB_URI;
+  assert.ok(uri);
+  await connectDatabase(uri);
+  assert.deepEqual(
+    await new ReservationService().listUserReservations(payload.userId),
+    [created],
+  );
+  const stored = await ReservationModel.findOne({ id: created.id }).orFail();
+  assert.ok(stored.resourceId instanceof mongoose.Types.ObjectId);
 });
 test('500 response hides internal exception details', async (): Promise<void> => {
   class FailingService extends ReservationService {
-    override create(_input: CreateReservationRequest): Reservation {
+    override async create(
+      _input: CreateReservationRequest,
+    ): Promise<Reservation> {
       throw new Error('private details');
     }
   }
@@ -193,7 +251,16 @@ test('500 response hides internal exception details', async (): Promise<void> =>
     });
   }
 });
-test('Mongoose models validate without a database', (): void => {
+test('Mongoose models validate strict fields and date ordering', async (): Promise<void> => {
+  const resource = await ResourceModel.findOne({
+    id: payload.resourceId,
+  }).orFail();
+  const stored = {
+    ...payload,
+    resourceId: resource._id,
+    startTimeText: payload.startTime,
+    endTimeText: payload.endTime,
+  };
   assert.equal(
     new UserModel({ id: 'user-456', name: 'Sample Student' }).validateSync(),
     undefined,
@@ -210,7 +277,7 @@ test('Mongoose models validate without a database', (): void => {
   );
   assert.equal(
     new ReservationModel({
-      ...payload,
+      ...stored,
       id: 'r-1',
       status: 'CONFIRMED',
     }).validateSync(),
@@ -221,9 +288,45 @@ test('Mongoose models validate without a database', (): void => {
   );
   assert.ok(
     new ReservationModel({
-      ...payload,
+      ...stored,
       id: 'r-1',
       status: 'INVALID',
     }).validateSync(),
   );
+  assert.ok(
+    new ReservationModel({
+      ...stored,
+      id: 'r-2',
+      status: 'PENDING',
+      endTime: payload.startTime,
+    }).validateSync(),
+  );
+  assert.ok(
+    new ReservationModel({
+      ...stored,
+      id: 'r-3',
+      status: 'PENDING',
+      resourceId: 'res-101',
+    }).validateSync(),
+  );
+  assert.throws((): void => {
+    new ResourceModel({ id: 'res-x', unexpected: true });
+  }, /not in schema/);
+});
+
+test('different service instances serialize concurrent bookings', async (): Promise<void> => {
+  const results = await Promise.allSettled(
+    Array.from({ length: 12 }, (): Promise<Reservation> =>
+      new ReservationService().create(payload),
+    ),
+  );
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      const error: unknown = result.reason;
+      assert.ok(typeof error === 'object' && error !== null && 'code' in error);
+      assert.equal(error.code, 'DOUBLE_BOOKING');
+    }
+  }
+  assert.equal(await ReservationModel.countDocuments({}), 1);
 });

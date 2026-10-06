@@ -1,4 +1,4 @@
-import { ApiError } from '../services/reservation.service.js';
+import { ApiError } from '../services/errors.js';
 import type {
   CreateReservationRequest,
   ResourceType,

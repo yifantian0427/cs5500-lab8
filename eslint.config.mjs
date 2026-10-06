@@ -15,4 +15,56 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['src/controllers/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['mongoose'],
+          patterns: [
+            {
+              group: ['**/models/**', '**/config/database*'],
+              message: 'Controllers must access persistence through services.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/services/**/*.ts', 'src/models/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['express'],
+          patterns: [
+            {
+              group: ['**/controllers/**', '**/routes/**', '**/middleware/**'],
+              message:
+                'Business and data layers must remain independent of HTTP.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/routes/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['mongoose'],
+          patterns: [
+            {
+              group: ['**/models/**', '**/services/**', '**/config/database*'],
+              message: 'Routes must map HTTP requests to controllers only.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
