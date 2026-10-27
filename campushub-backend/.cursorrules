@@ -1,0 +1,15 @@
+Follow AGENTS.md.
+
+Frontend guidelines:
+- Use React, TypeScript, and Vite inside client/.
+- Use functional components with explicit TypeScript prop interfaces.
+- Manage state with useState, useEffect, or custom hooks.
+- Keep API calls in client/src/api/campushubApi.ts, never inside JSX.
+- Match API types and endpoints to docs/openapi.yaml.
+- Use consistent, modular CSS.
+- Validate booking inputs before sending requests.
+- Handle loading, success, empty, and error states.
+- Show an explicit message for HTTP 409 booking conflicts.
+- Refresh reservations after creation or cancellation.
+- Prevent stale responses from overwriting current state.
+- Never use any; keep TypeScript strict checks passing.
