@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -7,6 +8,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import App from './App';
+import { UserReservations } from './components/UserReservations';
 import { BookingForm } from './components/BookingForm';
 import { ResourceList } from './components/ResourceList';
 import {
@@ -201,5 +203,47 @@ describe('student workflows', () => {
     fireEvent.click(screen.getByText('Retry'));
     await screen.findByText('Study Room 302');
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('reservation request ownership', () => {
+  it('ignores a cancellation failure after switching students', async () => {
+    let finishCancellation: (value: Response) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string, init?: RequestInit) => {
+        if (init?.method === 'PATCH')
+          return new Promise<Response>((resolve) => {
+            finishCancellation = resolve;
+          });
+        return Promise.resolve(
+          json([
+            {
+              ...reservation,
+              userId: input.includes('student-002')
+                ? 'student-002'
+                : 'student-001',
+            },
+          ]),
+        );
+      }),
+    );
+    const { rerender } = render(
+      <UserReservations userId="student-001" revision={0} />,
+    );
+    fireEvent.click(await screen.findByText('Cancel reservation'));
+    rerender(<UserReservations userId="student-002" revision={0} />);
+    await waitFor(() =>
+      expect(
+        (screen.getByText('Cancel reservation') as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    await act(async () => {
+      finishCancellation(json({ message: 'Old cancellation failed' }, 500));
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(
+      (screen.getByText('Cancel reservation') as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 });

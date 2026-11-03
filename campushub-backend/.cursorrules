@@ -1,15 +1,9 @@
-Follow AGENTS.md.
+Follow AGENTS.md for architecture, stack, validation, and review requirements.
 
-Frontend guidelines:
-- Use React, TypeScript, and Vite inside client/.
-- Use functional components with explicit TypeScript prop interfaces.
-- Manage state with useState, useEffect, or custom hooks.
-- Keep API calls in client/src/api/campushubApi.ts, never inside JSX.
-- Match API types and endpoints to docs/openapi.yaml.
-- Use consistent, modular CSS.
-- Validate booking inputs before sending requests.
-- Handle loading, success, empty, and error states.
-- Show an explicit message for HTTP 409 booking conflicts.
-- Refresh reservations after creation or cancellation.
-- Prevent stale responses from overwriting current state.
-- Never use any; keep TypeScript strict checks passing.
+Start with src/ and client/src/; read docs/openapi.yaml for API contract changes.
+Use src/types/reservation.ts as the shared frontend/backend wire contract.
+Keep reservation state and API orchestration in client/src/hooks/.
+Express 5 forwards async controller failures to src/middleware/errorHandler.ts.
+Inspect targeted files first. Read configuration or documentation only as needed.
+Do not load dependencies, compiled output, coverage, lockfiles, historical logs,
+or generated source maps as agent context; see .cursorignore.

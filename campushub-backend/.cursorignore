@@ -1,0 +1,21 @@
+# Generated/dependency content; keep source and configuration searchable.
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/.vite/
+**/logs/
+**/*.log
+**/*.log.*
+**/*.map
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+**/*.tsbuildinfo
+**/generated/
+**/.DS_Store
+# Secrets are not agent context.
+**/.env
+**/.env.*
+!**/.env-example
+!**/.env.example

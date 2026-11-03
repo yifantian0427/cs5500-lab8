@@ -1,26 +1,19 @@
-// Contract: docs/openapi.yaml (Lab 4). Datetimes include a timezone.
-export type ResourceType = 'ROOM' | 'EQUIPMENT' | 'LAB';
-export interface Resource {
-  id: string;
-  name: string;
-  type: ResourceType;
-  location: string;
-  isAvailable: boolean;
-}
-export interface CreateReservationDTO {
-  resourceId: string;
-  userId: string;
-  startTime: string;
-  endTime: string;
-}
-export interface Reservation extends CreateReservationDTO {
-  id: string;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-}
-export interface ErrorResponse {
-  code: string;
-  message: string;
-}
+// Shared wire contract: ISO 8601 dates are strings, not Date objects.
+import type {
+  ResourceType,
+  Resource,
+  Reservation,
+  ErrorResponse,
+  CreateReservationRequest as CreateReservationDTO,
+} from '../../../src/types/reservation';
+export type {
+  ResourceType,
+  Resource,
+  Reservation,
+  ErrorResponse,
+  CreateReservationRequest as CreateReservationDTO,
+} from '../../../src/types/reservation';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
