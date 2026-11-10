@@ -176,7 +176,7 @@ test('HTTP contract: resources, creation, conflicts, active lookup and validatio
     });
   }
 });
-test('pending blocks bookings; cancelled is excluded and does not block', async (): Promise<void> => {
+test('pending blocks bookings; cancelled is listed and does not block', async (): Promise<void> => {
   const resource = await ResourceModel.findOne({
     id: payload.resourceId,
   }).orFail();
@@ -195,6 +195,7 @@ test('pending blocks bookings; cancelled is excluded and does not block', async 
   const service = new ReservationService();
   assert.deepEqual(await service.listUserReservations(payload.userId), [
     { ...payload, id: 'pending', status: 'PENDING' },
+    { ...payload, id: 'cancelled', status: 'CANCELLED' },
   ]);
   await assert.rejects(service.create(payload), { code: 'DOUBLE_BOOKING' });
   await ReservationModel.updateOne(
@@ -329,4 +330,84 @@ test('different service instances serialize concurrent bookings', async (): Prom
     }
   }
   assert.equal(await ReservationModel.countDocuments({}), 1);
+});
+
+test('Lab 4: availability filters, cancellation, history and immediate rebooking', async (): Promise<void> => {
+  const server = createApp().listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
+  async function post(): Promise<Response> {
+    return fetch(`${base}/reservations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+  try {
+    for (const [query, count] of [
+      ['isAvailable=true', 2],
+      ['isAvailable=false', 1],
+      ['type=ROOM&isAvailable=false', 0],
+    ] as const) {
+      const response = await fetch(`${base}/resources?${query}`);
+      assert.equal(response.status, 200);
+      assert.equal(((await response.json()) as unknown[]).length, count);
+    }
+    for (const query of [
+      'isAvailable=',
+      'isAvailable=0',
+      'isAvailable=TRUE',
+      'isAvailable=true&isAvailable=false',
+    ]) {
+      assert.equal((await fetch(`${base}/resources?${query}`)).status, 400);
+    }
+    const created = await post();
+    assert.equal(created.status, 201);
+    const reservation = (await created.json()) as Reservation;
+    assert.equal((await post()).status, 409);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const cancelled = await fetch(
+        `${base}/reservations/${reservation.id}/cancel`,
+        { method: 'PATCH' },
+      );
+      assert.equal(cancelled.status, 200);
+      assert.deepEqual(await cancelled.json(), {
+        ...reservation,
+        status: 'CANCELLED',
+      });
+    }
+    assert.deepEqual(
+      await (await fetch(`${base}/reservations/user/${payload.userId}`)).json(),
+      [{ ...reservation, status: 'CANCELLED' }],
+    );
+    assert.equal((await post()).status, 201);
+    for (const id of ['missing', '%20']) {
+      assert.equal(
+        (await fetch(`${base}/reservations/${id}/cancel`, { method: 'PATCH' }))
+          .status,
+        400,
+      );
+    }
+    const resource = await ResourceModel.findOne({
+      id: payload.resourceId,
+    }).orFail();
+    await ReservationModel.create({
+      id: 'pending-cancel',
+      ...payload,
+      resourceId: resource._id,
+      startTime: new Date('2026-10-03T10:00:00Z'),
+      endTime: new Date('2026-10-03T11:00:00Z'),
+      startTimeText: '2026-10-03T10:00:00Z',
+      endTimeText: '2026-10-03T11:00:00Z',
+      status: 'PENDING',
+    });
+    assert.equal(
+      (await new ReservationService().cancel('pending-cancel')).status,
+      'CANCELLED',
+    );
+  } finally {
+    await new Promise<void>((resolve, reject): void => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });

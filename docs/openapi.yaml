@@ -4,7 +4,7 @@
     {
       'title': 'CampusHub Reservation API',
       'version': '1.0.0',
-      'description': 'Lab 2 API contract preserved by Lab 3 MongoDB implementation. Replica-set database required; no authentication.',
+      'description': 'Lab 4 reservation engine. Replica-set database required; no authentication.',
     },
   'servers': [{ 'url': 'http://localhost:3000/api/v1' }],
   'paths':
@@ -26,6 +26,13 @@
                         'type': 'string',
                         'enum': ['ROOM', 'EQUIPMENT', 'LAB'],
                       },
+                  },
+                  {
+                    'name': 'isAvailable',
+                    'in': 'query',
+                    'required': false,
+                    'schema': { 'type': 'boolean' },
+                    'description': 'Accepts exactly true or false.',
                   },
                 ],
               'responses':
@@ -169,8 +176,8 @@
           'get':
             {
               'operationId': 'listUserReservations',
-              'summary': 'List active reservations for a student',
-              'description': 'Active means PENDING or CONFIRMED, including historical records. CANCELLED records are excluded. Unknown user returns an empty array.',
+              'summary': 'List all reservations for a student',
+              'description': 'Includes PENDING, CONFIRMED and CANCELLED reservations. Unknown user returns an empty array.',
               'parameters':
                 [
                   {
@@ -190,7 +197,7 @@
                 {
                   '200':
                     {
-                      'description': 'Active reservations.',
+                      'description': 'All user reservations.',
                       'content':
                         {
                           'application/json':
@@ -203,6 +210,68 @@
                                       '$ref': '#/components/schemas/Reservation',
                                     },
                                 },
+                            },
+                        },
+                    },
+                  '400':
+                    {
+                      'description': 'Invalid input, missing resource, or unavailable resource.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  '$ref': '#/components/schemas/ErrorResponse',
+                                },
+                            },
+                        },
+                    },
+                  '500':
+                    {
+                      'description': 'Unexpected server failure.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                {
+                                  '$ref': '#/components/schemas/ErrorResponse',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+      '/reservations/{id}/cancel':
+        {
+          'patch':
+            {
+              'operationId': 'cancelReservation',
+              'summary': 'Cancel a reservation',
+              'description': 'Idempotent: repeated cancellation returns the cancelled reservation. Missing reservation returns 400. A completed cancellation frees the slot.',
+              'parameters':
+                [
+                  {
+                    'name': 'id',
+                    'in': 'path',
+                    'required': true,
+                    'schema':
+                      { 'type': 'string', 'pattern': '^[A-Za-z0-9_-]{1,100}$' },
+                  },
+                ],
+              'responses':
+                {
+                  '200':
+                    {
+                      'description': 'Cancelled reservation.',
+                      'content':
+                        {
+                          'application/json':
+                            {
+                              'schema':
+                                { '$ref': '#/components/schemas/Reservation' },
                             },
                         },
                     },

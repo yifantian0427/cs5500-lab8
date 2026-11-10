@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { ResourceService } from '../services/resource.service.js';
 import type { Resource } from '../types/reservation.js';
-import { resourceType } from '../middleware/validation.js';
+import { resourceType, availability } from '../middleware/validation.js';
 export class ResourceController {
   constructor(private readonly service: ResourceService) {}
   list = async (
@@ -10,6 +10,11 @@ export class ResourceController {
   ): Promise<void> => {
     response
       .status(200)
-      .json(await this.service.listResources(resourceType(request.query.type)));
+      .json(
+        await this.service.listResources(
+          resourceType(request.query.type),
+          availability(request.query.isAvailable),
+        ),
+      );
   };
 }

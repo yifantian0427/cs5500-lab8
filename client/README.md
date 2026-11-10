@@ -4,7 +4,7 @@ React + TypeScript + Vite client integrated with the Lab 4 API. No mock data is 
 
 ## Run locally
 
-From `campushub-backend/`:
+From the repository root:
 
 ```sh
 npm ci

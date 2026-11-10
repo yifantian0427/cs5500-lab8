@@ -67,3 +67,10 @@ export function reservationBody(value: unknown): CreateReservationRequest {
     endTime: dateTime(body.endTime),
   };
 }
+
+export function availability(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return invalid('isAvailable must be true or false when provided.');
+}

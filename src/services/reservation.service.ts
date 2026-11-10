@@ -10,7 +10,6 @@ export class ReservationService {
   async listUserReservations(userId: string): Promise<Reservation[]> {
     const records = await ReservationModel.find({
       userId,
-      status: { $ne: 'CANCELLED' },
     })
       .sort({ _id: 1 })
       .lean()
@@ -34,6 +33,32 @@ export class ReservationService {
         status: r.status,
       };
     });
+  }
+  async cancel(id: string): Promise<Reservation> {
+    const record = await ReservationModel.findOneAndUpdate(
+      { id },
+      { $set: { status: 'CANCELLED' } },
+      { new: true, runValidators: true },
+    ).exec();
+    if (!record)
+      throw new ApiError(
+        400,
+        'RESERVATION_NOT_FOUND',
+        'Reservation does not exist.',
+      );
+    const resource = await ResourceModel.findById(record.resourceId)
+      .lean()
+      .exec();
+    if (!resource)
+      throw new Error('Reservation has a missing resource reference.');
+    return {
+      id: record.id,
+      resourceId: resource.id,
+      userId: record.userId,
+      startTime: record.startTimeText,
+      endTime: record.endTimeText,
+      status: record.status,
+    };
   }
   async create(input: CreateReservationRequest): Promise<Reservation> {
     const startTime = new Date(input.startTime),

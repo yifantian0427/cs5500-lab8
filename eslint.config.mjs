@@ -67,4 +67,8 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['src/**/__tests__/**/*.ts'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
 );

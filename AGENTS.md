@@ -31,3 +31,7 @@ These instructions govern all work in this repository. Review generated code aga
 - Follow the existing structure and make the smallest coherent change.
 - Run relevant checks and exercise affected endpoints when possible.
 - In every PR or diff description, concisely state what was built, why it was built, and how these context rules shaped the change. Mention any checks that could not run.
+
+## Lab 5 frontend extension
+
+The user requested a React/TypeScript/Vite frontend in `client/`; these frontend dependencies and their testing tools are authorized for this lab. Backend stack restrictions remain in effect for backend code. Use functional components with explicit prop interfaces, standard React hooks, and modular consistent styling. Keep network operations in `client/src/api/campushubApi.ts`, never inline in JSX. Match `docs/openapi.yaml`; handle loading, empty, success and error states for every asynchronous workflow. Do not use `any`. Guard stale read responses after user/filter changes.

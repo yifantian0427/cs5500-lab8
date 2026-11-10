@@ -18,6 +18,14 @@ export class ReservationController {
       .status(201)
       .json(await this.service.create(reservationBody(request.body)));
   };
+  cancel = async (
+    request: Request,
+    response: Response<Reservation>,
+  ): Promise<void> => {
+    response
+      .status(200)
+      .json(await this.service.cancel(identifier(request.params.id)));
+  };
   listUser = async (
     request: Request,
     response: Response<Reservation[]>,

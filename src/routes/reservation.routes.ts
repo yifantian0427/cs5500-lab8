@@ -5,6 +5,7 @@ export function createReservationRouter(
 ): Router {
   const router = Router();
   router.post('/reservations', controller.create);
+  router.patch('/reservations/:id/cancel', controller.cancel);
   router.get('/reservations/user/:userId', controller.listUser);
   return router;
 }
