@@ -1,0 +1,127 @@
+name: CampusHub CI
+on:
+  push:
+    branches: [main, test/breaking-reservation-change]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      jest-outcome: ${{ steps.jest.outcome }}
+      failure-log: ${{ steps.log.outputs.failure-log }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:auto-heal
+      - name: Run Jest and capture failure output
+        id: jest
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test -- --ci --runInBand 2>&1 | tee test-results.log
+      - name: Preserve failed Jest output for repair job
+        id: log
+        if: failure() && steps.jest.outcome == 'failure'
+        shell: bash
+        run: |
+          printf 'failure-log=%s\n' "$(tail -c 48000 test-results.log | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+  auto-fix:
+    needs: test
+    # One repair per demonstration PR. Push events never create a duplicate PR.
+    # Forks and repair branches cannot trigger the privileged job.
+    if: >-
+      failure() && needs.test.outputs.jest-outcome == 'failure' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'test/breaking-reservation-change' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Restore failed Jest log
+        env:
+          FAILURE_LOG: ${{ needs.test.outputs.failure-log }}
+        run: printf '%s' "$FAILURE_LOG" | base64 --decode > test-results.log
+      - name: Diagnose and patch reservation source
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        run: node src/automation/autoHeal.ts
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:auto-heal
+      - run: npm test -- --ci --runInBand
+      - name: Verify patch scope
+        shell: bash
+        run: |
+          test "$(git diff --name-only)" = 'src/services/reservation.service.ts'
+          git diff --check
+      - name: Open one repair PR after verification
+        uses: actions/github-script@v7
+        env:
+          BASE_BRANCH: ${{ github.head_ref }}
+          FAILED_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_ID: ${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const {owner, repo} = context.repo;
+            const branch = `fix/auto-heal-${process.env.RUN_ID}`;
+            const base = process.env.BASE_BRANCH;
+            const current = await github.rest.repos.getBranch({owner, repo, branch: base});
+            if (current.data.commit.sha !== process.env.FAILED_SHA) {
+              core.setFailed('Source branch moved; refusing to publish a stale repair.');
+              return;
+            }
+            const prior = await github.paginate(github.rest.pulls.list, {owner, repo, state: 'all', base, per_page: 100});
+            if (prior.some(pr => pr.head.ref.startsWith('fix/auto-heal-'))) { core.info('Repair PR already exists.'); return; }
+            await github.rest.git.createRef({owner, repo, ref: `refs/heads/${branch}`, sha: process.env.FAILED_SHA});
+            const path = 'src/services/reservation.service.ts';
+            const original = await github.rest.repos.getContent({owner, repo, path, ref: process.env.FAILED_SHA});
+            await github.rest.repos.createOrUpdateFileContents({owner, repo, branch, path,
+              message: 'fix: repair reservation regression after failing Jest run',
+              sha: original.data.sha, content: fs.readFileSync(path).toString('base64')});
+            const audit = [
+              '## Automated verification',
+              'Typecheck, lint, runner safety tests, and the unchanged full Jest suite passed before publication.',
+              'Only src/services/reservation.service.ts was changed. This PR repairs the demonstration branch.',
+              '## Human review audit — pending',
+              '- [ ] Inspect the source diff and confirm the diagnosis and intended overlap/date behavior.',
+              '- [ ] Confirm no tests, assertions, configuration, or dependencies changed.',
+              '- [ ] Review the passing workflow logs and record reviewer name, date, and findings here.',
+              'Do not mark this review complete until a person performs it. No automatic merge is enabled.',
+              'AGENTS.md: TypeScript only; service logic remains independent of HTTP; no runtime dependencies added.',
+              `Workflow: ${context.serverUrl}/${owner}/${repo}/actions/runs/${process.env.RUN_ID}`,
+            ].join('\n\n');
+            const pr = await github.rest.pulls.create({owner, repo, head: branch, base,
+              title: 'fix: auto-heal reservation regression',
+              body: fs.readFileSync('auto-heal-summary.md', 'utf8') + '\n\n' + audit});
+            core.notice(`Repair PR: ${pr.data.html_url}`);

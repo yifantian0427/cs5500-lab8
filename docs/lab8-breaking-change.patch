@@ -1,0 +1,12 @@
+diff --git a/src/services/reservation.service.ts b/src/services/reservation.service.ts
+--- a/src/services/reservation.service.ts
++++ b/src/services/reservation.service.ts
+@@ -100,7 +100,7 @@ export class ReservationService {
+           startTime: { $lt: endTime },
+           endTime: { $gt: startTime },
+         }).session(session);
+-        if (conflict)
++        if (!conflict)
+           throw new ApiError(
+             409,
+             'DOUBLE_BOOKING',

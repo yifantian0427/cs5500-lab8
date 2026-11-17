@@ -119,3 +119,10 @@ in `src/` and one backend package/configuration at the root. `client/` contains
 the React frontend and its separate package. Both share `src/types/reservation.ts`.
 `docs/` contains the API contract and lab notes. The former nested
 `campushub-backend/` project has been consolidated into these directories.
+
+## Lab 8 auto-healing CI
+
+See [setup, break-and-fix demonstration, and review instructions](docs/lab8-auto-healing.md).
+The workflow opens a repair PR only after the unchanged Jest suite and static
+checks pass. Repository secret `OPENAI_API_KEY` and GitHub Actions PR creation
+permissions must be configured before the demonstration.
