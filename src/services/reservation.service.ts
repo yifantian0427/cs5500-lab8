@@ -97,7 +97,7 @@ export class ReservationService {
           startTime: { $lt: endTime },
           endTime: { $gt: startTime },
         }).session(session);
-        if (conflict)
+        if (!conflict)
           throw new ApiError(
             409,
             'DOUBLE_BOOKING',
