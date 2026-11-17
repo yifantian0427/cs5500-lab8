@@ -117,12 +117,7 @@ async function main(): Promise<void> {
       failure.error !== null &&
       'code' in failure.error &&
       typeof failure.error.code === 'string' &&
-      [
-        'insufficient_quota',
-        'rate_limit_exceeded',
-        'invalid_api_key',
-        'model_not_found',
-      ].includes(failure.error.code)
+      /^[a-z_]{1,80}$/.test(failure.error.code)
     )
       code = failure.error.code;
     throw new Error(`AI request failed: HTTP ${response.status}; code=${code}`);
