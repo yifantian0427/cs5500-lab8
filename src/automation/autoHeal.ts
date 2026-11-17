@@ -106,8 +106,27 @@ async function main(): Promise<void> {
       },
     }),
   });
-  if (!response.ok)
-    throw new Error(`AI request failed: HTTP ${response.status}`);
+  if (!response.ok) {
+    const failure: unknown = await response.json().catch((): null => null);
+    let code = 'unknown';
+    if (
+      typeof failure === 'object' &&
+      failure !== null &&
+      'error' in failure &&
+      typeof failure.error === 'object' &&
+      failure.error !== null &&
+      'code' in failure.error &&
+      typeof failure.error.code === 'string' &&
+      [
+        'insufficient_quota',
+        'rate_limit_exceeded',
+        'invalid_api_key',
+        'model_not_found',
+      ].includes(failure.error.code)
+    )
+      code = failure.error.code;
+    throw new Error(`AI request failed: HTTP ${response.status}; code=${code}`);
+  }
   const body: unknown = await response.json();
   if (
     typeof body !== 'object' ||
